@@ -1,6 +1,7 @@
-# Agent Skills
+# Agent Skills(-)
 
-A collection of [agent skills](https://agentskills.io) for AI coding assistants, installable via the [`skills` CLI](https://github.com/vercel-labs/skills).
+
+My humble collection of [agent skills](https://agentskills.io) for AI coding assistants, installable via the [`skills` CLI](https://github.com/vercel-labs/skills).
 
 ## Installation
 
