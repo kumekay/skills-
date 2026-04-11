@@ -19,16 +19,21 @@ A single Gitea instance may be reachable via multiple hostnames and may use a no
 
 ```bash
 # Issues
-tea issues list                       # list issues
-tea issues create --title "..." --body "..."  # create issue
-tea issues details <number>           # view issue details
+tea issues list                                      # list issues
+tea issues create --title "..." --description "..."  # create issue (note: --description, not --body)
+tea issues details <number>                          # view issue details
+tea issues edit <number> --description "..."         # edit issue title/description/labels/…
+tea issues close <number>                            # close issue
+tea issues reopen <number>                           # reopen issue
 
 # Pull Requests
-tea pulls list                        # list PRs
-tea pulls create --title "..." --body "..."   # create PR
-tea pulls details <number>            # view PR details
-tea pulls checkout <number>           # checkout PR locally
-tea pulls merge <number>              # merge PR
+tea pulls list                                       # list PRs
+tea pulls create --title "..." --description "..."   # create PR (note: --description, not --body)
+tea pulls details <number>                           # view PR details
+tea pulls checkout <number>                          # checkout PR locally
+tea pulls merge <number>                             # merge PR
+tea pulls close <number>                             # close PR
+tea pulls reopen <number>                            # reopen PR
 
 # Actions
 tea actions list                      # list action runs
@@ -40,7 +45,7 @@ tea releases list                     # list releases
 tea branches list                     # list branches
 tea labels list                       # list labels
 tea milestones list                   # list milestones
-tea comment <number> --body "..."     # comment on issue/PR
+tea comment <number> "..."                           # comment on issue/PR (body is positional)
 
 # Raw API access
 tea api <endpoint>                    # authenticated API request
@@ -49,11 +54,12 @@ tea api repos/owner/repo              # example: get repo info
 
 ## Long-form bodies (issues, PRs, comments)
 
-Do NOT pass multi-paragraph markdown into `--body "..."` on the command line.
-Shell escaping mangles backticks, quotes, and code fences — the rendered issue
-ends up with literal `\` before every backtick and `"`. Write the body to a
-file and read it through `tea api`'s `-F field=@file` form, which sends file
-contents verbatim:
+For multi-paragraph markdown bodies, write the body to a file and send it
+through `tea api`'s `-F field=@file` form. This is the safest path: the file
+contents go to the server verbatim, no shell-escape surprises with backticks,
+quotes, or code fences, and no flag-name differences between `tea` versions
+to worry about. `tea` subcommands do **not** provide a `--description-file`
+flag, so for file-driven bodies use `tea api`:
 
 ```bash
 # Create an issue with a long markdown body
@@ -79,26 +85,45 @@ always use `-F ...=@file`.
 
 ## Editing existing issues and PRs
 
-`tea` doesn't have a dedicated `edit` subcommand for most fields. Use
-`tea api -X PATCH` against the resource:
+**Issues** have a dedicated `tea issues edit` subcommand — prefer it for
+short edits:
 
 ```bash
-# Edit an issue body or title
+tea issues edit <n> --title "new title"
+tea issues edit <n> --description "short updated body"
+tea issues edit <n> --add-labels bug,urgent --milestone v1.2
+tea issues close <n>    # state changes go through close/reopen
+tea issues reopen <n>
+```
+
+For **long markdown** edits, still use `tea api -X PATCH` with `-F body=@file`
+(see the long-form bodies section above for why the file-driven form is
+preferred):
+
+```bash
+tea api -X PATCH repos/{owner}/{repo}/issues/{n} -F body=@/tmp/new-body.md
+```
+
+**Pull requests** do **not** have a `tea pulls edit` subcommand. Use
+`tea api -X PATCH` for any PR field edits. Title/body of a PR are edited via
+the issues endpoint (PRs and issues share it for those fields); branch, base,
+and state live on the pulls endpoint:
+
+```bash
+# Edit PR title / body (via the issues endpoint — same resource under the hood)
 tea api -X PATCH repos/{owner}/{repo}/issues/{n} -F body=@/tmp/new-body.md
 tea api -X PATCH repos/{owner}/{repo}/issues/{n} -f title="new title"
 
-# Edit a PR (PRs share the issues edit endpoint for body/title;
-# branch/base/state edits go through pulls/{n})
-tea api -X PATCH repos/{owner}/{repo}/issues/{n} -F body=@/tmp/new-body.md
+# Edit PR branch / base / state
 tea api -X PATCH repos/{owner}/{repo}/pulls/{n} -f state="closed"
 
-# Close or reopen
-tea api -X PATCH repos/{owner}/{repo}/issues/{n} -f state="closed"
-tea api -X PATCH repos/{owner}/{repo}/issues/{n} -f state="open"
+# Close / reopen a PR can also go through the dedicated subcommands
+tea pulls close <n>
+tea pulls reopen <n>
 ```
 
-After editing, re-fetch with `tea api repos/{owner}/{repo}/issues/{n}` to
-verify the body rendered cleanly with no stray escape characters.
+After any edit, re-fetch with `tea api repos/{owner}/{repo}/issues/{n}` (or
+`.../pulls/{n}`) to verify the body was stored as intended.
 
 ## Context Detection
 
@@ -141,5 +166,6 @@ Examples (replace `<host>` with the actual Gitea hostname):
 - Do not use `gh` (GitHub CLI) for Gitea repositories — use `tea`.
 - Do not use generic web fetch tools for Gitea data when `tea` can answer.
 - Do not switch away from `tea` just because a dedicated subcommand seems missing; try `tea api` first.
-- Do not pass long markdown bodies via `--body "..."` — shell escaping mangles backticks, quotes, and code fences. Write to a file and use `tea api ... -F body=@file.md` instead.
-- Do not assume `tea` has an `edit` subcommand for an issue/PR field — use `tea api -X PATCH` against the resource.
+- Do not use `--body` for issues, PRs, or comments — it does not exist on these subcommands and will error with `flag provided but not defined: -body`. Use `--description` (or `-d`) for `tea issues create`/`tea pulls create`/`tea issues edit`. `tea comment` takes the body as a positional argument: `tea comment <n> "body text"`.
+- Do not reach for a `--description-file` flag — `tea` subcommands do not have one. For file-driven markdown bodies, use `tea api ... -F body=@file.md`.
+- Do not assume `tea pulls edit` exists — it does not. Use `tea api -X PATCH repos/{owner}/{repo}/issues/{n}` for PR title/body and `.../pulls/{n}` for branch/base/state. `tea issues edit` does exist and should be preferred for issue edits.
