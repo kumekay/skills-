@@ -172,5 +172,5 @@ Examples (replace `<host>` with the actual Gitea hostname):
 - Do not use generic web fetch tools for Gitea data when `tea` can answer.
 - Do not switch away from `tea` just because a dedicated subcommand seems missing; try `tea api` first.
 - Do not use `--body` for issues, PRs, or comments — it does not exist on these subcommands and will error with `flag provided but not defined: -body`. Use `--description` (or `-d`) for `tea issues create`/`tea pulls create`/`tea issues edit`. `tea comment` takes the body as a positional argument: `tea comment <n> "body text"`.
-- Do not reach for a `--description-file` flag — `tea` subcommands do not have one. For file-driven markdown bodies, use `--description "$(cat /tmp/body.md)"` or fall back to `tea api ... -F body=@file.md`.
+- For long markdown bodies, write to a temp file and use `--description "$(cat /tmp/body.md)"`, or fall back to `tea api ... -F body=@file.md` for subcommands that lack `--description`.
 - Do not assume `tea pulls edit` exists — it does not. Use `tea api -X PATCH repos/{owner}/{repo}/issues/{n}` for PR title/body and `.../pulls/{n}` for branch/base/state. `tea issues edit` does exist and should be preferred for issue edits.
