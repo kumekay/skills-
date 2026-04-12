@@ -54,34 +54,41 @@ tea api repos/owner/repo              # example: get repo info
 
 ## Long-form bodies (issues, PRs, comments)
 
-For multi-paragraph markdown bodies, write the body to a file and send it
-through `tea api`'s `-F field=@file` form. This is the safest path: the file
-contents go to the server verbatim, no shell-escape surprises with backticks,
-quotes, or code fences, and no flag-name differences between `tea` versions
-to worry about. `tea` subcommands do **not** provide a `--description-file`
-flag, so for file-driven bodies use `tea api`:
+For multi-paragraph markdown bodies, write the content to a temp file first,
+then pass it via `--description "$(cat /tmp/file.md)"`. This avoids inline
+shell-quoting headaches with backticks, code fences, and nested quotes:
 
 ```bash
 # Create an issue with a long markdown body
-tea api -X POST repos/{owner}/{repo}/issues \
-  -f title="..." \
-  -F body=@/tmp/issue-body.md
+tea issues create --title "..." --description "$(cat /tmp/issue-body.md)"
 
 # Create a PR the same way
+tea pulls create --title "..." --description "$(cat /tmp/pr-body.md)"
+
+# Edit an existing issue body
+tea issues edit <n> --description "$(cat /tmp/new-body.md)"
+
+# Comment (body is positional)
+tea comment <n> "$(cat /tmp/comment.md)"
+```
+
+For cases not covered by a dedicated subcommand (e.g. creating a PR with
+extra fields, or editing a PR body), fall back to `tea api` with
+`-F body=@file` which sends file contents verbatim:
+
+```bash
 tea api -X POST repos/{owner}/{repo}/pulls \
   -f title="..." \
   -F body=@/tmp/pr-body.md \
   -f head="feature-branch" \
   -f base="main"
 
-# Add a long comment
 tea api -X POST repos/{owner}/{repo}/issues/{n}/comments \
   -F body=@/tmp/comment.md
 ```
 
 `-f` is for plain string fields; `-F` accepts `@file` to read from disk
-(`@-` for stdin). For one-line titles `-f` is fine; for markdown bodies
-always use `-F ...=@file`.
+(`@-` for stdin).
 
 ## Editing existing issues and PRs
 
@@ -96,12 +103,10 @@ tea issues close <n>    # state changes go through close/reopen
 tea issues reopen <n>
 ```
 
-For **long markdown** edits, still use `tea api -X PATCH` with `-F body=@file`
-(see the long-form bodies section above for why the file-driven form is
-preferred):
+For **long markdown** edits, write to a temp file and use `$(cat ...)`:
 
 ```bash
-tea api -X PATCH repos/{owner}/{repo}/issues/{n} -F body=@/tmp/new-body.md
+tea issues edit <n> --description "$(cat /tmp/new-body.md)"
 ```
 
 **Pull requests** do **not** have a `tea pulls edit` subcommand. Use
@@ -167,5 +172,5 @@ Examples (replace `<host>` with the actual Gitea hostname):
 - Do not use generic web fetch tools for Gitea data when `tea` can answer.
 - Do not switch away from `tea` just because a dedicated subcommand seems missing; try `tea api` first.
 - Do not use `--body` for issues, PRs, or comments — it does not exist on these subcommands and will error with `flag provided but not defined: -body`. Use `--description` (or `-d`) for `tea issues create`/`tea pulls create`/`tea issues edit`. `tea comment` takes the body as a positional argument: `tea comment <n> "body text"`.
-- Do not reach for a `--description-file` flag — `tea` subcommands do not have one. For file-driven markdown bodies, use `tea api ... -F body=@file.md`.
+- Do not reach for a `--description-file` flag — `tea` subcommands do not have one. For file-driven markdown bodies, use `--description "$(cat /tmp/body.md)"` or fall back to `tea api ... -F body=@file.md`.
 - Do not assume `tea pulls edit` exists — it does not. Use `tea api -X PATCH repos/{owner}/{repo}/issues/{n}` for PR title/body and `.../pulls/{n}` for branch/base/state. `tea issues edit` does exist and should be preferred for issue edits.
