@@ -26,3 +26,4 @@ To install into the current project instead, drop the `-g` flag.
 | [undercover](undercover/SKILL.md) | Operate without revealing AI identity. Strips all AI attribution from commits, PRs, code comments, and public-facing text. |
 | [using-cloner](using-cloner/SKILL.md) | Use [`clone`](https://github.com/kumekay/cloner) instead of `git clone` to clone repos or get the local directory of an existing checkout. |
 | [using-tea-for-gitea](using-tea-for-gitea/SKILL.md) | Use the `tea` CLI for all Gitea interactions — issues, PRs, actions, releases, and raw API access. |
+| [using-clikunja](using-clikunja/SKILL.md) | Use the `clikunja` CLI for all Vikunja interactions — projects, tasks, labels, comments, and raw API access. |
