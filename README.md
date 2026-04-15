@@ -3,6 +3,9 @@
 
 My humble collection of [agent skills](https://agentskills.io) for AI coding assistants, installable via the [`skills` CLI](https://github.com/vercel-labs/skills).
 
+> [!TIP]
+> **Browse the full catalog at [skills.kumekay.com](http://skills.kumekay.com/)** — a searchable index of these skills plus skills from other repos, with one-click install commands.
+
 ## Installation
 
 Requires Node.js 18+. Install all skills globally:
