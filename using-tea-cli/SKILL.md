@@ -1,17 +1,19 @@
 ---
-name: using-tea-for-gitea
-description: Use `tea` CLI for all interactions with Gitea instances, including repositories, issues, pull requests, actions, releases, labels, milestones, and branches. Use when the user mentions a Gitea host, shares a Gitea URL, asks about Gitea repos, or wants to create/manage issues, PRs, or actions on Gitea. Also use when the current git remote points to a Gitea host. Prefer `tea` over browser tools or generic web fetching for any Gitea data.
+name: using-tea-cli
+description: Use the `tea` CLI for all interactions with Gitea and Forgejo instances (including Codeberg), such as repositories, issues, pull requests, actions, releases, labels, milestones, and branches. Use when the user mentions a Gitea or Forgejo host, shares a URL from one, or wants to create or manage issues, PRs, or actions there. Also use when the current git remote points to a Gitea or Forgejo host. Prefer `tea` over browser tools or generic web fetching for this data.
 ---
 
-# Using `tea` For Gitea
+# Using the `tea` CLI
 
 ## Rule
 
-When interacting with a Gitea instance, use the `tea` CLI. This includes issues, pull requests, releases, actions, branches, labels, milestones, webhooks, and any other Gitea entities.
+When interacting with a Gitea or Forgejo instance, use the `tea` CLI. This includes issues, pull requests, releases, actions, branches, labels, milestones, webhooks, and any other entities.
 
-A single Gitea instance may be reachable via multiple hostnames and may use a non-standard SSH port (e.g. `ssh://git@host:PORT/owner/repo.git`). Treat these as the same instance.
+Forgejo is a fork of Gitea and keeps the Gitea API (`/api/v1`), so `tea` works with both. In this document, "instance" means a Gitea or a Forgejo server. Most commands behave the same on both. See [Forgejo differences](#forgejo-differences) for the exceptions.
 
-- Do not use browser-style fetching or generic web tools for a Gitea host when `tea` can provide the data.
+A single instance may be reachable via multiple hostnames and may use a non-standard SSH port (e.g. `ssh://git@host:PORT/owner/repo.git`). Treat these as the same instance.
+
+- Do not use browser-style fetching or generic web tools for an instance when `tea` can provide the data.
 - Do not guess API paths when `tea help <command>` can answer directly.
 - For REST API access not covered by dedicated commands, use `tea api`.
 
@@ -35,9 +37,10 @@ tea pulls merge <number>                             # merge PR
 tea pulls close <number>                             # close PR
 tea pulls reopen <number>                            # reopen PR
 
-# Actions
-tea actions list                      # list action runs
-tea actions details <run-id>          # view run details
+# Actions (on Forgejo, see "Forgejo differences")
+tea actions runs list                 # list workflow runs
+tea actions runs view <run-id>        # view run details and jobs
+tea actions runs logs <run-id>        # view run logs
 
 # Other entities
 tea repos list                        # list repos
@@ -132,15 +135,15 @@ After any edit, re-fetch with `tea api repos/{owner}/{repo}/issues/{n}` (or
 
 ## Context Detection
 
-`tea` automatically detects the repository from the current directory's git remote. When the user is working in a repo hosted on a configured Gitea instance, `tea` commands work without specifying the repo explicitly.
+`tea` automatically detects the repository from the current directory's git remote. When the user is working in a repo hosted on a configured instance, `tea` commands work without specifying the repo explicitly.
 
-If the user is not in a repo directory, or needs to target a different repo, use `--repo owner/repo` or `--login <login-name>` to select a configured Gitea login.
+If the user is not in a repo directory, or needs to target a different repo, use `--repo owner/repo` or `--login <login-name>` to select a configured login. Run `tea logins list` to see the configured logins and their URLs.
 
 ## URL Handling
 
-If the user gives a Gitea URL, parse the owner and repo from the URL path, extract the resource type and ID, and use the appropriate `tea` command.
+If the user gives a URL from an instance, parse the owner and repo from the URL path, extract the resource type and ID, and use the appropriate `tea` command.
 
-Examples (replace `<host>` with the actual Gitea hostname):
+Examples (replace `<host>` with the actual hostname):
 
 - Issue URL: `https://<host>/owner/repo/issues/5`
   Use: `tea issues details 5 --repo owner/repo`
@@ -153,11 +156,39 @@ Examples (replace `<host>` with the actual Gitea hostname):
 
 ## Workflow
 
-1. Check if the requested data lives on a Gitea host (via URL, git remote, or user context).
+1. Check if the requested data lives on a Gitea or Forgejo host (via URL, git remote, or user context).
 2. If yes, use `tea`.
 3. If a dedicated `tea` subcommand exists, prefer it.
 4. If not, use `tea api` for direct API access.
 5. If access fails, report the error clearly instead of switching tools.
+
+## Forgejo differences
+
+To check which server you talk to, run `tea api version`:
+
+- Gitea returns a plain version, for example `{"version":"1.27.3"}`.
+- Forgejo returns its own version with a `+gitea-` suffix, for example `{"version":"16.0.5+gitea-1.22.0"}`. The suffix is the Gitea API level that Forgejo keeps compatible with.
+
+Forgejo's actions API does not match what `tea` expects. On Forgejo:
+
+- `tea actions runs list` works, but the WORKFLOW, BRANCH, and STARTED columns are empty.
+- `tea actions runs view` and `tea actions runs logs` fail with `json: cannot unmarshal array into Go value of type gitea.ActionsWorkflowJobsResponse`.
+
+Use `tea api` for actions on Forgejo:
+
+```bash
+# List runs with workflow name, branch, status, and web URL
+tea api repos/{owner}/{repo}/actions/tasks
+
+# Runs with workflow file (workflow_id) and status
+tea api repos/{owner}/{repo}/actions/runs
+
+# Jobs of one run (each job has an `id`)
+tea api repos/{owner}/{repo}/actions/runs/<run-id>/jobs
+
+# Logs of one job (plain text)
+tea api repos/{owner}/{repo}/actions/jobs/<job-id>/logs
+```
 
 ## Failure Handling
 
@@ -168,8 +199,8 @@ Examples (replace `<host>` with the actual Gitea hostname):
 
 ## Common Mistakes
 
-- Do not use `gh` (GitHub CLI) for Gitea repositories — use `tea`.
-- Do not use generic web fetch tools for Gitea data when `tea` can answer.
+- Do not use `gh` (GitHub CLI) for Gitea or Forgejo repositories — use `tea`.
+- Do not use generic web fetch tools for Gitea or Forgejo data when `tea` can answer.
 - Do not switch away from `tea` just because a dedicated subcommand seems missing; try `tea api` first.
 - Do not use `--body` for issues, PRs, or comments — it does not exist on these subcommands and will error with `flag provided but not defined: -body`. Use `--description` (or `-d`) for `tea issues create`/`tea pulls create`/`tea issues edit`. `tea comment` takes the body as a positional argument: `tea comment <n> "body text"`.
 - For long markdown bodies, write to a temp file and use `--description "$(cat /tmp/body.md)"`, or fall back to `tea api ... -F body=@file.md` for subcommands that lack `--description`.
